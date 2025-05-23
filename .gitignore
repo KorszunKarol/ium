@@ -38,11 +38,12 @@ Thumbs.db
 # IDE specific
 .vscode/
 .idea/
+.cursor/
 
 # Data & Models (Consider Git LFS for these or keep them untracked if very large)
-# data/raw/
-# data/processed/
-# models/
+data/raw/
+data/processed/
+models/
 
 # Logs
 *.log
