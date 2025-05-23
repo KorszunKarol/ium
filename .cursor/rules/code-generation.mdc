@@ -1,0 +1,122 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Python Coding Rules
+
+## General Principles
+
+*   Adhere to [PEP 8 -- Style Guide for Python Code](mdc:https:/peps.python.org/pep-0008). Use linters (like Flake8, Pylint) and formatters (like Black, isort) to enforce consistency.
+*   Write clear, readable, and maintainable code. Prioritize clarity over cleverness ("Explicit is better than implicit").
+*   Use meaningful names for variables, functions, classes, and modules.
+*   Use type hints ([PEP 484 -- Type Hints](mdc:https:/peps.python.org/pep-0484)) for function signatures and variables to improve clarity and enable static analysis.
+
+## Comments vs. Docstrings
+
+*   **Strictly No Comments**: Do **not** use inline comments (`#`) or block comments (`#` on multiple lines) for explaining code logic, purpose, or behavior. Code should aim to be self-documenting.
+*   **Mandatory Docstrings**: All public modules, functions, classes, and methods **must** have docstrings. Non-public methods should also have docstrings if their purpose or behavior is not immediately obvious from their name and code.
+*   **Docstring Content**: Docstrings should explain *what* the code does, its purpose, arguments (`Args:`), return values (`Returns:`), and any exceptions raised (`Raises:`). Follow [PEP 257 -- Docstring Conventions](mdc:https:/peps.python.org/pep-0257) (e.g., Google or NumPy style). Explain the *why* behind non-obvious design choices within the docstring if necessary, but avoid explaining *how* the code works unless the implementation is unusually complex.
+
+## Idiomatic Python
+
+*   **Comprehensions**: Prefer list/dict/set comprehensions over `map()`/`filter()` or explicit `for` loops for creating collections when readability is maintained.
+*   **Generators**: Use generator functions (`yield`) and generator expressions (`(x for x in ...)`) for lazy evaluation and memory efficiency, especially with large sequences or streams.
+*   **Iteration**: Use `enumerate()` for loops requiring indices and `zip()` for parallel iteration over multiple sequences.
+*   **Unpacking**: Utilize tuple/list unpacking for assignments and function arguments (`*args`, `**kwargs`) where appropriate.
+*   **f-strings**: Use f-strings (Python 3.6+) for string formatting for readability and generally good performance. For joining many strings, prefer `"".join(iterable)`.
+
+## Resource Management
+
+*   **Context Managers (`with` statement)**: **Always** use the `with` statement for managing resources that require cleanup (e.g., files, network sockets, database connections, locks). Implement custom context managers or use `@contextlib.contextmanager` for custom resources. Ensure cleanup logic is robust within `__exit__` or the `finally` block of a decorated generator.
+
+## Error Handling
+
+*   **Specific Exceptions**: Catch specific exception types, not bare `except:` or generic `Exception`, unless intentionally re-raising or handling all exceptions at a high level.
+*   **Custom Exceptions**: Define application-specific exceptions by inheriting from `Exception` or a more specific built-in exception type.
+*   **Avoid Silent Failures**: Do not use `pass` in an `except` block without careful consideration and documenting the reasoning in the docstring. Log errors or handle them appropriately.
+*   **Cleanup**: Use `finally` or (preferably) the `with` statement for essential cleanup actions that must occur regardless of exceptions.
+
+## Performance Considerations
+
+*   **Use Built-ins**: Leverage built-in functions and methods optimized in C where applicable.
+*   **Data Structures**: Choose the appropriate data structure for the task based on the time complexity of required operations (e.g., `set` for fast membership testing, `dict` for key lookups).
+*   **Local Scope**: Prefer local variables over global variables within function scopes for faster access.
+
+## Structure and Design
+
+*   **Single Responsibility**: Keep functions and methods focused on a single, well-defined task.
+*   **Modularity**: Organize code into logical modules and packages.
+*   **Immutability**: Use immutable data structures (tuples, frozensets) when data is not intended to change after creation.
+*   **Decorators**: Use decorators (`@`) for cleanly adding cross-cutting concerns (logging, memoization, access control, etc.) to functions and methods.
+*   **Testing**: Write comprehensive unit and integration tests (e.g., using `pytest`) to ensure code correctness and maintainability. (While not strictly code style, it's a critical practice).
+
+## Data Science / AI Specific Practices
+
+*   **Vectorization (NumPy/Pandas)**: Prioritize vectorized operations provided by NumPy and Pandas over native Python loops (`for`, `while`) for numerical tasks to leverage optimized C/Fortran backend performance.
+*   **Efficient Data Types (Pandas)**: Inspect DataFrame memory usage (`df.info()`, `df.memory_usage(deep=True)`). Use the most memory-efficient `dtype` appropriate for the data (e.g., `category` for low-cardinality text, downcast numerics like `float64`->`float32`, `int64`->`int32`/`int16`/`int8`).
+*   **Avoid Slow Iteration (Pandas)**: Avoid `.iterrows()` and minimize use of `.apply()` with custom functions. Seek vectorized alternatives first. If complex row-wise logic is unavoidable, consider libraries like Numba or Cython for acceleration.
+*   **Safe Assignment (Pandas)**: Avoid chained assignment (`df[...][...] = ...`). Use `.loc[row_indexer, col_indexer] = value` for setting values to prevent `SettingWithCopyWarning`.
+*   **Reproducibility - Environment**: Pin dependencies with specific versions in `requirements.txt` (pip) or `environment.yml` (conda). Consider Docker for consistent environments across machines.
+*   **Reproducibility - Stochasticity**: Explicitly set random seeds (`random.seed`, `numpy.random.seed`, framework-specific seeds) for all processes involving randomness (e.g., train/test splits, model weight initialization, sampling).
+*   **Reproducibility - Configuration**: Store hyperparameters, file paths, and other configuration variables in external files (e.g., YAML, JSON) instead of hardcoding them in scripts or notebooks.
+*   **Data & Model Versioning**: Implement strategies for versioning datasets and trained models (e.g., using clear directory structures, naming conventions, or tools like DVC).
+*   **Experiment Tracking**: Use dedicated tools (e.g., MLflow, W&B) or systematic logging to record experiment parameters, code versions, data versions, metrics, and output artifacts.
+*   **Modular Code**: Refactor complex data processing pipelines and model training logic from notebooks into reusable functions and classes within `.py` modules. Import these into notebooks for execution.
+*   **Clear Visualization**: Ensure plots and visualizations are clearly labeled (titles, axes, legends) and appropriate for the data being presented. Use docstrings in plotting functions to explain their purpose and parameters.
+
+## Example (Docstring & Context Manager)
+
+```python
+import contextlib
+import time
+from typing import Iterator
+
+@contextlib.contextmanager
+def timer() -> Iterator[None]:
+    """A context manager to time the execution of a block of code.
+
+    Yields:
+        None
+
+    Example:
+        >>> with timer():
+        ...     time.sleep(1)
+        # Output like: Block executed in 1.00 seconds
+    """
+    start_time = time.perf_counter()
+    try:
+        yield
+    finally:
+        end_time = time.perf_counter()
+        elapsed_time = end_time - start_time
+        print(f"Block executed in {elapsed_time:.2f} seconds")
+
+def read_data(file_path: str) -> str:
+    """Reads the entire content of a file.
+
+    Args:
+        file_path: The path to the file to read.
+
+    Returns:
+        The content of the file as a string.
+
+    Raises:
+        FileNotFoundError: If the file does not exist.
+        IOError: If an error occurs during reading.
+    """
+    try:
+        # 'with' ensures the file is closed even if errors occur during read
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        return content
+    except FileNotFoundError:
+        # Re-raise specific, expected errors documented in Raises
+        raise
+    except IOError as e:
+        # Handle or re-raise other potential IO errors
+        raise IOError(f"Error reading file {file_path}: {e}") from e
+
+# NO comments explaining the 'with' statement or 'try/except' logic.
+# The docstring explains the purpose and expected errors.
+# The use of 'with' is standard practice for file handling.
