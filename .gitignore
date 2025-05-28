@@ -48,3 +48,6 @@ models/
 # Logs
 *.log
 logs/
+*.md
+*.csv
+*.png
