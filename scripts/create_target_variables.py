@@ -36,23 +36,23 @@ class TargetVariableGenerator:
     def _load_config(self, config_path: Optional[str]) -> Dict:
         """Load configuration or use defaults."""
         default_config = {
-            "minimum_observation_days": 30,  # Minimum days needed for reliable estimates
-            "minimum_bookings": 3,  # Minimum bookings needed for reliable ADR
+            "minimum_observation_days": 30,
+            "minimum_bookings": 3,
             "confidence_thresholds": {
-                "high": 180,  # Days of observation for high confidence
-                "medium": 90,  # Days for medium confidence
-                "low": 30,   # Days for low confidence
+                "high": 180,
+                "medium": 90,
+                "low": 30,
             },
             "outlier_treatment": {
-                "revenue_percentile_cap": 99,  # Cap extreme revenue outliers
-                "adr_percentile_cap": 99,     # Cap extreme ADR outliers
-                "min_reasonable_adr": 10,     # Minimum reasonable daily rate
-                "max_reasonable_adr": 2000,   # Maximum reasonable daily rate
+                "revenue_percentile_cap": 100,
+                "adr_percentile_cap": 100,
+                "min_reasonable_adr": 10,
+                "max_reasonable_adr": 2000,
             },
             "seasonality": {
                 "use_monthly_adjustment": True,
                 "use_weekday_adjustment": True,
-                "market_location": "london",  # Used for default seasonality if no external data
+                "market_location": "london",
             },
         }
 
@@ -75,31 +75,31 @@ class TargetVariableGenerator:
         - December is also high due to holidays
         - January-February are typically lowest
         """
-        # Default London seasonality profile (can be replaced with external data)
+
         london_seasonality = {
-            1: 0.85,   # January - Low season
-            2: 0.88,   # February - Low season
-            3: 0.95,   # March - Building up
-            4: 1.05,   # April - Spring demand
-            5: 1.10,   # May - Good weather starts
-            6: 1.25,   # June - Peak summer
-            7: 1.30,   # July - Peak summer
-            8: 1.25,   # August - Peak summer
-            9: 1.15,   # September - Still good
-            10: 1.05,  # October - Cooling down
-            11: 0.95,  # November - Lower demand
-            12: 1.15,  # December - Holiday season
+            1: 0.85,
+            2: 0.88,
+            3: 0.95,
+            4: 1.05,
+            5: 1.10,
+            6: 1.25,
+            7: 1.30,
+            8: 1.25,
+            9: 1.15,
+            10: 1.05,
+            11: 0.95,
+            12: 1.15,
         }
 
-        # Weekday patterns (Monday=0, Sunday=6)
+
         weekday_seasonality = {
-            0: 0.90,  # Monday
-            1: 0.92,  # Tuesday
-            2: 0.95,  # Wednesday
-            3: 0.98,  # Thursday
-            4: 1.10,  # Friday
-            5: 1.20,  # Saturday
-            6: 1.15,  # Sunday
+            0: 0.90,
+            1: 0.92,
+            2: 0.95,
+            3: 0.98,
+            4: 1.10,
+            5: 1.20,
+            6: 1.15,
         }
 
         return {
@@ -132,31 +132,31 @@ class TargetVariableGenerator:
         self.log("🎯 Starting Target Variable Generation")
         self.log(f"Calendar data shape: {calendar_df.shape}")
 
-        # Prepare calendar data
+
         calendar_clean = self._prepare_calendar_data(calendar_df)
 
-        # Filter listings if provided
+
         if listings_df is not None:
             calendar_clean = self._filter_with_listings_context(calendar_clean, listings_df)
 
-        # Calculate observed performance for each listing
+
         observed_performance = self._calculate_observed_performance(calendar_clean)
 
-        # Apply seasonality adjustments
+
         adjusted_performance = self._apply_seasonality_adjustments(
             observed_performance, calendar_clean
         )
 
-        # Annualize the metrics
+
         target_variables = self._annualize_metrics(adjusted_performance)
 
-        # Calculate confidence scores
+
         target_variables = self._calculate_confidence_scores(target_variables)
 
-        # Apply outlier treatment
+
         target_variables = self._treat_outliers(target_variables)
 
-        # Final validation and cleanup
+
         target_variables = self._final_validation(target_variables)
 
         self.log(f"✅ Target generation complete. Generated targets for {len(target_variables)} listings")
@@ -168,12 +168,12 @@ class TargetVariableGenerator:
 
         df = calendar_df.copy()
 
-        # Ensure proper data types
+
         df['date'] = pd.to_datetime(df['date'])
         df['available'] = df['available'].astype(bool)
         df['price_cleaned'] = pd.to_numeric(df['price_cleaned'], errors='coerce')
 
-        # Remove invalid prices
+
         initial_rows = len(df)
         df = df[df['price_cleaned'] > 0]
         df = df[df['price_cleaned'].notna()]
@@ -181,16 +181,16 @@ class TargetVariableGenerator:
         if len(df) < initial_rows:
             self.log(f"Removed {initial_rows - len(df)} rows with invalid prices")
 
-        # Create booking indicator (available=False means booked)
+
         df['is_booked'] = ~df['available']
 
-        # Add temporal features for seasonality adjustment
+
         df['month'] = df['date'].dt.month
         df['weekday'] = df['date'].dt.weekday
         df['year'] = df['date'].dt.year
         df['week_of_year'] = df['date'].dt.isocalendar().week
 
-        # Calculate revenue (only for booked days)
+
         df['revenue'] = df['price_cleaned'] * df['is_booked']
 
         self.stats['calendar_date_range'] = {
@@ -211,7 +211,7 @@ class TargetVariableGenerator:
         """Filter calendar data using listings context."""
         self.log("🏠 Applying listings context filters")
 
-        # Filter out listings with extreme minimum nights (they have different patterns)
+
         if 'minimum_nights' in listings_df.columns:
             reasonable_min_nights = listings_df['minimum_nights'] <= 30
             valid_listings = listings_df[reasonable_min_nights]['id']
@@ -228,45 +228,45 @@ class TargetVariableGenerator:
         """Calculate raw observed performance metrics for each listing."""
         self.log("📊 Calculating observed performance metrics")
 
-        # Group by listing and calculate basic metrics
+
         listing_stats = calendar_df.groupby('listing_id').agg({
-            'is_booked': ['sum', 'count'],  # bookings and total observations
-            'revenue': 'sum',               # total revenue
-            'price_cleaned': 'mean',        # average listed price
-            'date': ['min', 'max'],         # observation period
+            'is_booked': ['sum', 'count'],
+            'revenue': 'sum',
+            'price_cleaned': 'mean',
+            'date': ['min', 'max'],
         }).reset_index()
 
-        # Flatten column names
+
         listing_stats.columns = [
             'listing_id', 'total_bookings', 'total_observations',
             'total_revenue', 'avg_listed_price', 'obs_start_date', 'obs_end_date'
         ]
 
-        # Calculate observation period in days
+
         listing_stats['observation_days'] = (
             listing_stats['obs_end_date'] - listing_stats['obs_start_date']
         ).dt.days + 1
 
-        # Calculate raw metrics
+
         listing_stats['raw_occupancy_rate'] = (
             listing_stats['total_bookings'] / listing_stats['total_observations']
         )
 
-        # Calculate ADR (Average Daily Rate) - only for days that were booked
+
         adr_data = calendar_df[calendar_df['is_booked']].groupby('listing_id').agg({
             'price_cleaned': 'mean'
         }).reset_index()
         adr_data.columns = ['listing_id', 'raw_adr']
 
-        # Merge ADR data
+
         listing_stats = listing_stats.merge(adr_data, on='listing_id', how='left')
 
-        # For listings with no bookings, use their average listed price as ADR estimate
+
         listing_stats['raw_adr'] = listing_stats['raw_adr'].fillna(
             listing_stats['avg_listed_price']
         )
 
-        # Calculate raw daily revenue rate
+
         listing_stats['raw_daily_revenue'] = (
             listing_stats['raw_occupancy_rate'] * listing_stats['raw_adr']
         )
@@ -282,7 +282,7 @@ class TargetVariableGenerator:
         """Apply seasonality adjustments to normalize performance metrics."""
         self.log("🌊 Applying seasonality adjustments")
 
-        # Calculate weighted seasonality factors for each listing
+
         listing_seasonality = []
 
         for listing_id in performance_df['listing_id']:
@@ -291,21 +291,21 @@ class TargetVariableGenerator:
             if len(listing_calendar) == 0:
                 continue
 
-            # Calculate monthly seasonality adjustment
+
             monthly_factors = []
             monthly_weights = []
 
             for _, row in listing_calendar.iterrows():
                 monthly_factor = self.seasonality_profile['monthly'][row['month']]
                 monthly_factors.append(monthly_factor)
-                # Weight by whether it was booked (booked days matter more for revenue)
+
                 weight = 2.0 if row['is_booked'] else 1.0
                 monthly_weights.append(weight)
 
-            # Calculate weighted average seasonality factor
+
             avg_monthly_factor = np.average(monthly_factors, weights=monthly_weights)
 
-            # Calculate weekday seasonality adjustment
+
             weekday_factors = []
             weekday_weights = []
 
@@ -317,7 +317,7 @@ class TargetVariableGenerator:
 
             avg_weekday_factor = np.average(weekday_factors, weights=weekday_weights)
 
-            # Combined seasonality factor
+
             combined_factor = (avg_monthly_factor + avg_weekday_factor) / 2
 
             listing_seasonality.append({
@@ -329,10 +329,10 @@ class TargetVariableGenerator:
 
         seasonality_df = pd.DataFrame(listing_seasonality)
 
-        # Merge with performance data
+
         adjusted_df = performance_df.merge(seasonality_df, on='listing_id', how='left')
 
-        # Apply adjustments (divide by seasonality factor to normalize)
+
         adjusted_df['seasonally_adj_adr'] = (
             adjusted_df['raw_adr'] / adjusted_df['combined_seasonality_factor']
         )
@@ -353,26 +353,26 @@ class TargetVariableGenerator:
         """Convert observed metrics to annualized projections."""
         self.log("📈 Annualizing metrics to yearly projections")
 
-        # Calculate annualization factor based on observation period
+
         adjusted_df['annualization_factor'] = 365.25 / adjusted_df['observation_days']
 
-        # Cap extreme annualization factors (for very short observation periods)
+
         adjusted_df['annualization_factor'] = adjusted_df['annualization_factor'].clip(
-            upper=12.0  # Don't extrapolate more than 12x (1 month to full year)
+            upper=12.0
         )
 
-        # Annualize revenue
+
         adjusted_df['annual_revenue_adj'] = (
             adjusted_df['seasonally_adj_daily_revenue'] * 365.25
         )
 
-        # Annualized occupancy (this should stay as-is, it's already a rate)
+
         adjusted_df['occupancy_rate_adj'] = adjusted_df['seasonally_adj_occupancy']
 
-        # Seasonally adjusted ADR (this should stay as-is, it's a daily rate)
+
         adjusted_df['adr_adj'] = adjusted_df['seasonally_adj_adr']
 
-        # Calculate raw annualized versions for comparison
+
         adjusted_df['annual_revenue_raw'] = (
             adjusted_df['total_revenue'] * adjusted_df['annualization_factor']
         )
@@ -390,7 +390,7 @@ class TargetVariableGenerator:
         for _, row in target_df.iterrows():
             score_components = []
 
-            # 1. Observation period score (0-40 points)
+
             obs_days = row['observation_days']
             if obs_days >= self.config['confidence_thresholds']['high']:
                 obs_score = 40
@@ -403,7 +403,7 @@ class TargetVariableGenerator:
 
             score_components.append(obs_score)
 
-            # 2. Booking frequency score (0-30 points)
+
             total_bookings = row['total_bookings']
             if total_bookings >= 20:
                 booking_score = 30
@@ -416,14 +416,14 @@ class TargetVariableGenerator:
 
             score_components.append(booking_score)
 
-            # 3. Data consistency score (0-20 points)
-            # Check for reasonable values
+
+
             adr = row['adr_adj']
             occupancy = row['occupancy_rate_adj']
 
             consistency_score = 20
 
-            # Penalize extreme values
+
             if adr < self.config['outlier_treatment']['min_reasonable_adr'] or \
                adr > self.config['outlier_treatment']['max_reasonable_adr']:
                 consistency_score -= 10
@@ -431,20 +431,20 @@ class TargetVariableGenerator:
             if occupancy < 0 or occupancy > 1:
                 consistency_score -= 10
 
-            if row['annualization_factor'] > 6:  # Very short observation period
+            if row['annualization_factor'] > 6:
                 consistency_score -= 5
 
             score_components.append(max(0, consistency_score))
 
-            # 4. Seasonality coverage score (0-10 points)
-            # Better score if observation covers multiple seasons
-            seasonality_score = min(10, obs_days / 30)  # 1 point per month covered
+
+
+            seasonality_score = min(10, obs_days / 30)
             score_components.append(seasonality_score)
 
-            # Total confidence score (0-100)
+
             total_score = sum(score_components)
 
-            # Classify confidence level
+
             if total_score >= 80:
                 confidence_level = 'high'
             elif total_score >= 60:
@@ -466,7 +466,7 @@ class TargetVariableGenerator:
 
         confidence_df = pd.DataFrame(confidence_scores)
 
-        # Merge with target data
+
         result_df = target_df.merge(confidence_df, on='listing_id', how='left')
 
         confidence_dist = result_df['confidence_level'].value_counts()
@@ -478,30 +478,39 @@ class TargetVariableGenerator:
         """Apply outlier treatment to target variables."""
         self.log("🔧 Treating outliers in target variables")
 
-        # Define outlier treatment for each target variable
+
         outlier_treatments = {
             'annual_revenue_adj': self.config['outlier_treatment']['revenue_percentile_cap'],
             'adr_adj': self.config['outlier_treatment']['adr_percentile_cap'],
-            'occupancy_rate_adj': 100,  # Should be 0-1, so 100th percentile is fine
+            'occupancy_rate_adj': 100,
         }
 
         for col, percentile_cap in outlier_treatments.items():
             if col in target_df.columns:
-                # Calculate bounds
+
                 lower_bound = target_df[col].quantile(0.01)
-                upper_bound = target_df[col].quantile(percentile_cap / 100)
 
-                # Count outliers before treatment
-                outliers_count = ((target_df[col] < lower_bound) |
-                                 (target_df[col] > upper_bound)).sum()
 
-                # Apply capping
-                target_df[col] = target_df[col].clip(lower=lower_bound, upper=upper_bound)
 
-                if outliers_count > 0:
-                    self.log(f"Capped {outliers_count} outliers in {col}")
 
-        # Ensure occupancy rate is between 0 and 1
+
+
+
+                if col == 'annual_revenue_adj':
+                    outliers_count_lower = (target_df[col] < lower_bound).sum()
+                    target_df[col] = target_df[col].clip(lower=lower_bound)
+                    if outliers_count_lower > 0:
+                        self.log(f"Capped {outliers_count_lower} lower outliers in {col}")
+                else:
+                    upper_bound = target_df[col].quantile(percentile_cap / 100)
+                    outliers_count = ((target_df[col] < lower_bound) |
+                                     (target_df[col] > upper_bound)).sum()
+                    target_df[col] = target_df[col].clip(lower=lower_bound, upper=upper_bound)
+
+                    if outliers_count > 0:
+                        self.log(f"Capped {outliers_count} outliers in {col}")
+
+
         target_df['occupancy_rate_adj'] = target_df['occupancy_rate_adj'].clip(0, 1)
 
         return target_df
@@ -512,7 +521,7 @@ class TargetVariableGenerator:
 
         initial_count = len(target_df)
 
-        # Remove listings with insufficient data
+
         min_obs_days = self.config['minimum_observation_days']
         min_bookings = self.config['minimum_bookings']
 
@@ -530,7 +539,7 @@ class TargetVariableGenerator:
         if removed_count > 0:
             self.log(f"Removed {removed_count} listings with insufficient/invalid data")
 
-        # Create final target variable columns
+
         final_columns = [
             'listing_id',
             'annual_revenue_adj',
@@ -543,18 +552,18 @@ class TargetVariableGenerator:
             'total_observations',
             'annualization_factor',
             'combined_seasonality_factor',
-            # Keep raw metrics for comparison
+
             'annual_revenue_raw',
             'raw_occupancy_rate',
             'raw_adr',
         ]
 
-        # Add additional metadata
+
         target_df['data_quality_flags'] = target_df.apply(self._generate_quality_flags, axis=1)
 
         result_df = target_df[final_columns + ['data_quality_flags']].copy()
 
-        # Generate final statistics
+
         self.stats['final_targets'] = {
             'total_listings': len(result_df),
             'confidence_distribution': result_df['confidence_level'].value_counts().to_dict(),
@@ -603,23 +612,23 @@ class TargetVariableGenerator:
         """Save target variables and related artifacts."""
         os.makedirs(output_dir, exist_ok=True)
 
-        # Save target variables
+
         target_df.to_pickle(os.path.join(output_dir, 'reliable_targets.pkl'))
         target_df.to_csv(os.path.join(output_dir, 'reliable_targets.csv'), index=False)
 
-        # Save configuration
+
         with open(os.path.join(output_dir, 'target_generation_config.json'), 'w') as f:
             json.dump(self.config, f, indent=2)
 
-        # Save statistics
+
         with open(os.path.join(output_dir, 'target_generation_stats.json'), 'w') as f:
             json.dump(self.stats, f, indent=2, default=str)
 
-        # Save seasonality profile
+
         with open(os.path.join(output_dir, 'seasonality_profile.json'), 'w') as f:
             json.dump(self.seasonality_profile, f, indent=2)
 
-        # Save processing log
+
         with open(os.path.join(output_dir, 'target_generation_log.txt'), 'w') as f:
             f.write('\n'.join(self.log_messages))
 
@@ -683,32 +692,32 @@ class TargetVariableGenerator:
 def main():
     """Example usage of the target variable generator."""
 
-    # Initialize the generator
+
     generator = TargetVariableGenerator()
 
     print("Loading data...")
     data_dir = "data/processed/etap2/"
 
     try:
-        # Load calendar and listings data
+
         calendar_df = pd.read_pickle(os.path.join(data_dir, "calendar_e2_df.pkl"))
         listings_df = pd.read_pickle(os.path.join(data_dir, "listings_e2_df.pkl"))
 
         print(f"Loaded calendar: {calendar_df.shape}")
         print(f"Loaded listings: {listings_df.shape}")
 
-        # Generate target variables
+
         print("\nGenerating target variables...")
         target_variables = generator.generate_targets(calendar_df, listings_df)
 
-        # Create output directory
+
         output_dir = "data/processed/etap2/target_variables/"
         os.makedirs(output_dir, exist_ok=True)
 
-        # Save results
+
         generator.save_artifacts(target_variables, output_dir)
 
-        # Generate and save report
+
         report = generator.generate_report(target_variables)
         with open(os.path.join(output_dir, 'target_generation_report.json'), 'w') as f:
             json.dump(report, f, indent=2, default=str)
