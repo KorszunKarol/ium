@@ -1,0 +1,341 @@
+\documentclass[a4paper,11pt]{article}
+
+% Podstawowe pakiety
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[polish]{babel}
+\usepackage{csquotes}
+
+% Nowoczesna typografia
+\usepackage{microtype}
+\usepackage{lmodern}
+\usepackage[scale=0.9]{tgheros}
+\usepackage[scale=0.85]{inconsolata}
+
+% Układ strony
+\usepackage[margin=2.5cm,headheight=15pt]{geometry}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage{parskip}
+\setlength{\parindent}{0pt}
+
+% Matematyka i formuły
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{bm}
+
+% Listy, tabele i grafika
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.16}
+
+% Odnośniki
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+
+% Nagłówki i stopki
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0.5pt}
+\fancyhead[L]{Nocarz: Analiza potencjału lokalizacji}
+\fancyhead[R]{\textit{Etap 1}}
+\fancyfoot[C]{Strona \thepage\ z \pageref{LastPage}}
+
+% Sekcje
+\usepackage{titlesec}
+\titleformat{\section}
+  {\normalfont\Large\bfseries\color{blue!70!black}}
+  {\thesection}{1em}{}
+\titleformat{\subsection}
+  {\normalfont\large\bfseries\color{blue!60!black}}
+  {\thesubsection}{1em}{}
+
+% Kolory i ramki
+\definecolor{shadecolor}{rgb}{0.95,0.95,0.95}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins,breakable}
+
+\newtcolorbox{infobox}{
+  enhanced,
+  colback=blue!5!white,
+  colframe=blue!75!black,
+  arc=0mm,
+  breakable,
+  title=\textbf{Podsumowanie},
+  fonttitle=\bfseries
+}
+
+\begin{document}
+\begin{titlepage}
+  \begin{center}
+    \vspace*{2cm}
+    \begin{tikzpicture}
+      \node[inner sep=0pt] at (0,0) {
+        % WAŻNE: Upewnij się, że plik obrazu 'example-image' (lub jego zamiennik) istnieje
+        % w tym samym katalogu co plik .tex lub podaj poprawną ścieżkę.
+        % Jeśli nie masz obrazu, możesz zakomentować poniższą linię:
+        \includegraphics[width=0.4\textwidth]{example-image}}; % Przykładowy obraz
+    \end{tikzpicture}
+    \vfill
+    {\Huge\bfseries Analiza Potencjału Lokalizacji\\
+    Nocarz w Londynie\par}
+    \vspace{1cm}
+    {\large\itshape Etap 1: Definicja problemu i analiza danych\par}
+    \vfill
+    {\large Zespół Analityczny\par}
+    \vspace{1cm}
+    {\large \today\par}
+  \end{center}
+\end{titlepage}
+
+\tableofcontents
+\clearpage
+
+\section{Definicja problemu biznesowego, zadania modelowania, założenia i kryteria sukcesu}
+
+\subsection{Definicja problemu biznesowego}
+\begin{tcolorbox}[colback=blue!5,colframe=blue!50!black,title=Problem biznesowy]
+\textbf{Kontekst:} Zarząd Nocarza, odpowiednio na inicjatywę oddziału w Londynie, dąży do optymalizacji działań marketingowych w celu zwiększenia liczby ofert na portalu. Obecne działania marketingowe są rozproszone.
+
+\textbf{Potrzeba:} Zidentyfikowanie dzielnic (\emph{neighbourhoods}) w Londynie, które wykazują największy \textbf{potencjał przychodu} (proxy dla zysku). Informacja kluczowa do skierowania kampanii marketingowej zachęcającej właścicieli nieruchomości do wystawiania ofert w tych lokalizacjach.
+\end{tcolorbox}
+
+\vspace{0.5cm}
+
+\subsection{Zadania modelowania (Mapowanie zadania domenowego na analityczne)}
+
+Aby zrealizować cel biznesowy, zadanie zostało zdekomponowane na następujące etapy:
+
+\begin{enumerate}[label=\textbf{Zadanie \arabic*.}, leftmargin=*]
+  \item \textbf{Przygotowanie danych (ETL)}\\
+    \textit{Cel: Uzyskanie czystych i spójnych danych wejściowych.}
+    \begin{itemize}[label=$\triangleright$,itemsep=3pt]
+      \item Wczytanie plików \texttt{listings.csv}, \texttt{calendar.csv}, \texttt{reviews.csv}.
+      \item Oczyszczenie i konwersja kolumny \texttt{price} (usunięcie symboli walut i przecinków → \texttt{float}).
+      \item Parsowanie dat w \texttt{calendar.csv} i mapowanie \texttt{available} ('t'/'f') → 1/0.
+      \item Ujednolicenie typu i nazwy klucza \texttt{listing\_id}.
+    \end{itemize}
+
+  \item \textbf{Inżynieria cech (feature engineering)}\\
+    \textit{Cel: Obliczenie historycznych metryk wydajności dla każdej oferty (Etap 1) oraz etykiet dla modeli ML (Etap 2).}
+
+    Dla każdej oferty obliczamy następujące historyczne metryki ($Y_{hist}$) na podstawie danych z \texttt{calendar.csv}:
+    \begin{itemize}
+        \item Wskaźnik obłożenia historycznego ($Occ_{hist}$).
+        \item Średnia cena dzienna historyczna ($ADR_{hist}$), obliczana jako średnia cena tylko dla dni, kiedy oferta była dostępna (\texttt{available='t'}).
+        \item Szacowany roczny przychód historyczny ($Rev_{annual, hist}$).
+    \end{itemize}
+    Obliczenia wykonujemy według wzorów:
+    \begin{align*}
+      Occ_{hist} &= \frac{\text{liczba dni zajętych}}{\text{liczba dni w analizowanym okresie}} \\
+      ADR_{hist} &= \text{średnia}(\texttt{price}_{\text{calendar}}) \quad \text{dla dni gdy } \texttt{available='t'} \\
+      Rev_{annual, hist} &= ADR_{hist} \times Occ_{hist} \times 365
+    \end{align*}
+    Te wartości ($Y_{hist}$) służą jako podstawa rankingu w Etapie 1 oraz jako zmienne docelowe (etykiety) dla modeli ML w Etapie 2.
+
+
+  \item \textbf{Zadania ML (planowane Etap 2)}\\
+    \textit{Cel: Budowa modeli predykcyjnych dla ofert bez kompletnej historii.} Modele ($f$) będą mapować wektor cech oferty ($X_{listing}$) na przewidywane metryki ($\widehat{Y}$).
+    \begin{enumerate}[label=\alph*),leftmargin=1.5cm]
+      \item \textit{Regresja komponentowa:} Budowa osobnych modeli dla obłożenia ($\widehat{Occ}$) i ADR ($\widehat{ADR}$), a następnie połączenie predykcji:
+        \begin{gather*} % Using gather* for multiple centered equations
+          f_1(X_{listing}) \rightarrow \widehat{Occ} \\
+          f_2(X_{listing}) \rightarrow \widehat{ADR} \\
+          \widehat{Rev}_{annual} = \widehat{ADR} \times \widehat{Occ} \times 365
+        \end{gather*}
+      \item \textit{Regresja bezpośrednia:} Budowa jednego modelu przewidującego bezpośrednio roczny przychód ($\widehat{Rev}_{annual}$):
+        \begin{equation*} % Using equation* for a single centered equation
+          f_3(X_{listing}) \rightarrow \widehat{Rev}_{annual}
+        \end{equation*}
+    \end{enumerate}
+
+
+  \item \textbf{Agregacja i ranking (Etap 1)}\\
+    \textit{Cel: Wygenerowanie finalnego rankingu dzielnic.}
+    \begin{itemize}[label=$\square$,itemsep=3pt]
+      \item Połączenie ofert z obliczonymi metrykami (dla Etapu 1: $Y_{hist}$).
+      \item Grupowanie po \texttt{neighbourhood\_cleansed} i obliczenie dla każdej dzielnicy: mediany/średniej $Rev_{annual, hist}$, mediany $Occ_{hist}$, mediany $ADR_{hist}$ oraz liczby ofert.
+      \item Posortowanie dzielnic według mediany $Rev_{annual, hist}$ i wygenerowanie rankingu top 20 (lub innej ustalonej liczby).
+    \end{itemize}
+\end{enumerate}
+
+\vspace{0.5cm}
+
+\subsection{Kluczowe założenia}
+\begin{tcolorbox}[colback=yellow!5!white,colframe=yellow!50!black,title=Założenia projektu]
+\begin{itemize}[label=$\bullet$,itemsep=5pt]
+  \item \textbf{Reprezentatywność danych:} Dane z lat 2024–2025 (lub okresu objętego plikami \texttt{calendar.csv}) reprezentują typowy popyt i sezonowość rynku wynajmu krótkoterminowego w Londynie istotne dla przyszłego potencjału.
+  \item \textbf{Przychód jako proxy zysku:} Szacowany roczny przychód ($Rev_{annual, hist}$ lub $\widehat{Rev}_{annual}$) jest wystarczająco dobrym wskaźnikiem potencjału lokalizacji dla celów marketingowych (zakładamy, że koszty operacyjne są pomijalne, stałe lub proporcjonalne do przychodu w skali dzielnicy, bądź ich zróżnicowanie między dzielnicami jest niewielkie).
+  \item \textbf{Porównywalność cen:} Ceny po oczyszczeniu i konwersji są wyrażone w tej samej walucie (domyślnie GBP) i są porównywalne między ofertami.
+  \item \textbf{Stabilność rynku:} Brak przewidywanych przyszłych, jednorazowych, ekstremalnych zdarzeń zewnętrznych (np. nowa pandemia, nieoczekiwane wielkie wydarzenia sportowe/kulturalne), które mogłyby znacząco zaburzyć historyczne trendy i wpłynąć na trafność predykcji/rankingu.
+  \item \textbf{Wiarygodność danych źródłowych:} Dane scrapingowe (\texttt{listings.csv}) oraz dane kalendarza i recenzji, mimo potencjalnych braków i szumów, stanowią generalnie wiarygodne źródło informacji o aktywności i charakterystyce ofert na platformie Nocarz.
+  \item \textbf{Modelowalność zależności:} Istnieje wystarczająca i możliwa do uchwycenia przez modele analityczne (w tym ML) zależność między cechami oferty ($X_{listing}$) a jej metrykami operacyjnymi ($Y_{hist}$ lub ich predykcjami $\widehat{Y}$).
+\end{itemize}
+\end{tcolorbox}
+
+\vspace{0.5cm}
+
+\subsection{Kryteria sukcesu projektu}
+
+\begin{tcolorbox}[enhanced,colback=green!5!white,colframe=green!50!black,
+                 boxrule=0.5mm,title=Kryteria sukcesu analityczne/modelowania]
+\begin{itemize}[label=\checkmark, leftmargin=*, itemsep=5pt]
+  \item \textbf{Jakość danych:} Poprawne przetworzenie i konwersja >95\% wartości w kluczowych kolumnach wejściowych (\texttt{price} w obu plikach, \texttt{date} w \texttt{calendar.csv}, \texttt{available}). Ustalenie i udokumentowanie strategii obsługi krytycznych braków danych (np. w \texttt{listing\_id}, \texttt{neighbourhood\_cleansed}).
+  \item \textbf{Pokrycie metryk historycznych:} Obliczenie $Occ_{hist}$ i $ADR_{hist}$ dla co najmniej 70\% unikalnych ofert posiadających wystarczającą liczbę (np. >30) dni obserwacji w \texttt{calendar.csv}.
+  \item \textbf{Dokładność modeli (Etap 2):} Modele ML szacujące $Occ$ i $ADR$ (lub bezpośrednio $Rev_{annual}$) osiągają dokładność (mierzoną np. przez RMSE lub MAPE na zbiorze testowym) poprawioną o co najmniej 10\% w stosunku do prostego baseline (np. predykcja średniej/mediany dla danej dzielnicy lub typu nieruchomości).
+  \item \textbf{Kompletność i stabilność rankingu:} Wygenerowanie rankingu obejmującego wszystkie zidentyfikowane dzielnice (np. >30) z wiarygodną oceną potencjału przychodu. Ranking powinien być stabilny przy niewielkich zmianach danych wejściowych lub parametrów modelu.
+  \item \textbf{Powtarzalność procesu:} Dostarczenie udokumentowanego i (w miarę możliwości) zautomatyzowanego kodu/workflow umożliwiającego łatwą aktualizację analizy i rankingu w przyszłości przy użyciu nowych danych.
+\end{itemize}
+\end{tcolorbox}
+
+\begin{tcolorbox}[enhanced,colback=cyan!5!white,colframe=cyan!60!black,
+                 boxrule=0.5mm,title=Kryteria sukcesu biznesowe]
+\begin{itemize}[label=$\bullet$, leftmargin=*, itemsep=5pt]
+  \item \textbf{Użyteczność biznesowa:} Dostarczony finalny ranking dzielnic jest zaakceptowany przez zespół marketingowy Nocarz Londyn jako wiarygodne i praktyczne źródło informacji do planowania i targetowania kampanii pozyskiwania nowych ofert.
+  \item \textbf{Mierzalny wpływ:} Kampania marketingowa, skierowana na czołowe dzielnice wskazane przez analizę, osiąga statystycznie istotny wzrost (uplift) w pozyskiwaniu nowych ofert lub wzroście przychodu w porównaniu do kampanii kontrolnej, targetującej losowo lub równomiernie wybrane dzielnice. (Wymaga zaplanowania i przeprowadzenia testu A/B lub podobnej metody ewaluacji).
+  \item \textbf{Terminowość:} Dostarczenie kompletnych wyników projektu (finalny ranking, raport, kod) zgodnie z ustalonym terminem: \textbf{do 2025-04-25}.
+\end{itemize}
+\end{tcolorbox}
+
+\clearpage
+
+\section{Analiza danych z perspektywy realizacji zadań}
+
+\subsection{Dostępne dane i proces ich generowania}
+
+Projekt bazuje na trzech głównych plikach CSV, prawdopodobnie wyeksportowanych z wewnętrznych systemów Nocarz lub pozyskanych drogą scrapingu:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Plik} & \textbf{Zawartość} & \textbf{Rozmiar} & \textbf{Rola w analizie} \\
+\midrule
+\texttt{listings.csv}  & Profil ofert         & ~28,5 tys.\ wierszy, 75 kolumn & Główne cechy wejściowe ($X_{listing}$) \\
+\texttt{calendar.csv}  & Ceny i dostępność    & ~10,4 mln wierszy, 7 kolumn   & Dane do obliczenia etykiet historycznych ($Y_{hist}$) \\
+\texttt{reviews.csv}   & Recenzje             & ~572 tys.\ wierszy, 7 kolumn  & Potencjalne dodatkowe cechy (np. review velocity) \\
+\bottomrule
+\end{tabular}
+\caption{Przegląd dostępnych zbiorów danych.}
+\label{tab:datasets}
+\end{table}
+
+\textbf{Proces generowania danych (domniemany):} Należy założyć, że \texttt{listings.csv} zawiera migawkę stanu ofert (być może z różnych momentów scrapowania - vide kolumna \texttt{last\_scraped}, jeśli wiarygodna). \texttt{calendar.csv} rejestruje dzienną dostępność i cenę ofert w pewnym horyzoncie czasowym, co jest kluczowe dla metryk operacyjnych. \texttt{reviews.csv} zawiera dane wprowadzane przez użytkowników po pobycie. Jakość i kompletność danych mogą być zróżnicowane w zależności od źródła, czasu ich pozyskania, kompletności profilu oferty/hosta oraz aktywności użytkowników. Potencjalne źródła błędów/braków to m.in. opóźnienia w aktualizacji danych, błędy scrapingu, niekompletne profile, oferty nieaktywne lub z krótką historią.
+
+\subsection{Ocena wystarczalności i jakości danych}
+
+\begin{center}
+\begin{tikzpicture}
+\begin{axis}[
+    title={Szacunkowa kompletność kluczowych kolumn (przed czyszczeniem)},
+    ybar,
+    symbolic x coords={
+      listing\_id(listings), % Added ID completeness
+      neighbourhood\_cleansed,
+      price(listing),
+      price(calendar),
+      available(calendar),
+      review\_scores(listing),
+      listing\_id(calendar), % Added ID completeness in calendar
+      listing\_id(reviews)  % Added ID completeness in reviews
+    },
+    xtick=data,
+    xticklabel style={rotate=45,anchor=east, font=\small}, % Smaller font for labels
+    nodes near coords,
+    nodes near coords style={font=\tiny, rotate=90, anchor=west}, % Adjusted node style
+    ymin=0, ymax=100,
+    ylabel={\% niepustych wartości},
+    bar width=0.6cm, % Adjusted bar width
+    width=\textwidth, % Make plot wider
+    height=8cm % Adjust height
+]
+% Approximate percentages based on project_context.md info() / number of rows
+% listing_id(listings): ~19994 / 28543 = ~70%
+% neighbourhood_cleansed: ~19899 / 28543 = ~70%
+% price(listing): ~13127 / 28543 = ~46%
+% price(calendar): ~7292814 / 10417861 = ~70%
+% available(calendar): ~7293170 / 10417861 = ~70%
+% review_scores_rating: ~14792 / 28543 = ~52%
+% listing_id(calendar): ~7291415 / 10417861 = ~70%
+% listing_id(reviews): ~400384 / 572190 = ~70%
+\addplot coordinates {
+  (listing\_id(listings),70)
+  (neighbourhood\_cleansed,70)
+  (price(listing),46)
+  (price(calendar),70)
+  (available(calendar),70)
+  (review\_scores(listing),52)
+  (listing\_id(calendar),70)
+  (listing\_id(reviews),70)
+};
+\end{axis}
+\end{tikzpicture}
+\end{center}
+
+\begin{tcolorbox}[colback=red!5!white,colframe=red!50!black,title=Główne ograniczenia i wyzwania jakościowe]
+\begin{itemize}[label=$\times$,leftmargin=*,itemsep=2pt]
+  \item \textbf{Braki w kluczowych identyfikatorach:} Około 30\% wierszy we wszystkich plikach (\texttt{listings}, \texttt{calendar}, \texttt{reviews}) ma brakujący \texttt{listing\_id}, co utrudnia łączenie danych i analizę pełnej populacji ofert.
+  \item \textbf{Braki w cechach ofert (\texttt{listings.csv}):} Istotne braki (>30-50\%) w kolumnach potencjalnie predykcyjnych, takich jak \texttt{bedrooms}, \texttt{bathrooms}, \texttt{beds}, \texttt{host\_response\_rate}, \texttt{host\_acceptance\_rate}, \texttt{review\_scores\_*}. Utrudni to budowę modeli ML bez zaawansowanej imputacji.
+  \item \textbf{Brakująca lokalizacja (\texttt{neighbourhood\_cleansed}):} Około 30\% ofert w \texttt{listings.csv} nie ma przypisanej kluczowej zmiennej grupującej. Wymaga to imputacji lub strategii obsługi (np. na podstawie lat/lng lub jako \'Unknown\'), co może wprowadzić niedokładność.
+  \item \textbf{Jakość danych kalendarza (\texttt{calendar.csv}):} Poza brakami w \texttt{listing\_id}, również kolumny \texttt{date}, \texttt{available}, \texttt{price} mają znaczące braki (~30\%). Możliwy dodatkowy szum w cenach, niespójności, krótki okres obserwacji dla niektórych ofert, co może wpływać na wiarygodność obliczonych metryk historycznych ($Occ_{hist}$, $ADR_{hist}$). Wymaga starannego czyszczenia i potencjalnej walidacji.
+  \item \textbf{Ograniczone dane recenzji (\texttt{reviews.csv}):} Znaczące luki w \texttt{listing\_id} i \texttt{date} (~30\%) ograniczają możliwość pełnego wykorzystania tych danych (np. do estymacji "prędkości recenzji" jako proxy popytu) dla wszystkich ofert.
+  \item \textbf{Brak informacji o kosztach:} Dane nie zawierają informacji o kosztach operacyjnych (sprzątanie, prowizje, podatki, utrzymanie), co uniemożliwia bezpośrednie obliczenie \textbf{zysku}. Szacowany przychód jest jedynie proxy.
+  \item \textbf{Brak kontekstu rynkowego:} Brak danych zewnętrznych o ogólnej sytuacji na rynku nieruchomości w Londynie, działaniach konkurencji, charakterystyce transportu publicznego, bliskości atrakcji turystycznych, bezpieczeństwie czy demografii poszczególnych dzielnic. Mogłyby one potencjalnie wzbogacić modelowanie i wyjaśnić różnice między dzielnicami.
+\end{itemize}
+\end{tcolorbox}
+
+\subsection{Strategia uzupełnienia i naprawy danych (Proponowana)}
+
+\begin{tcolorbox}[enhanced,breakable,colback=blue!5!white,colframe=blue!40!black,title=Proponowane działania naprawcze]
+\begin{enumerate}[label=\textbf{Działanie \arabic*.},leftmargin=2cm,itemsep=5pt]
+  \item \textbf{Obsługa brakujących ID:} Wiersze z brakującym \texttt{listing\_id} w plikach \texttt{calendar.csv} i \texttt{reviews.csv} zostaną usunięte przed łączeniem/agregacją, gdyż nie można ich przypisać do konkretnej oferty. Oferty bez ID w \texttt{listings.csv} zostaną usunięte z dalszej analizy.
+  \item \textbf{Imputacja brakujących dzielnic (\texttt{neighbourhood\_cleansed}):}\\
+    Dla ofert z brakującą dzielnicą, ale poprawnymi \texttt{latitude}/\texttt{longitude}, zastosujemy:
+    \begin{itemize}
+      \item Przypisanie dzielnicy na podstawie przynależności punktu (lat/lng) do znanego poligonu geograficznego dzielnicy (wymaga zewnętrznych danych o granicach dzielnic, np. z OpenStreetMap lub urzędowych).
+      \item Jeśli powyższe niemożliwe lub współrzędne też brakują: oznaczenie jako osobna kategoria 'Unknown' lub (mniej preferowane) usunięcie tych ofert.
+    \end{itemize}
+  \item \textbf{Czyszczenie i standaryzacja cen (\texttt{price}):}\\
+    Implementacja funkcji czyszczącej dla \texttt{price} w \texttt{listings.csv} i \texttt{calendar.csv}:
+    \begin{itemize}
+      \item Usunięcie symboli walut (£, \$, ...) i separatorów tysięcy (,).
+      \item Konwersja na typ numeryczny (\texttt{float}).
+      \item Analiza rozkładu i obsługa potencjalnych wartości ekstremalnych (np. przez logowanie, winsoryzację lub oznaczenie jako błąd).
+    \end{itemize}
+  \item \textbf{Obsługa braków w \texttt{calendar.csv}:}\\
+    Wiersze z brakującą datą (\texttt{date}) zostaną usunięte. Braki w \texttt{available} lub \texttt{price} (po konwersji) uniemożliwią obliczenie metryk dla danego dnia; wpłynie to na mianownik przy obliczaniu $Occ_{hist}$. Należy rozważyć minimalny wymagany okres obserwacji dla oferty.
+  \item \textbf{Imputacja brakujących cech w \texttt{listings.csv} (Dla Etapu 2 - ML):}\\
+    Dla modeli ML rozważymy imputację kluczowych cech z brakami, stosując odpowiednie metody:
+    \begin{itemize}
+      \item Numeryczne (\texttt{bedrooms}, \texttt{beds}, \texttt{review\_scores\_*}): imputacja medianą lub średnią (ew. warunkową na \texttt{room\_type}/\texttt{property\_type}), potencjalnie połączona z dodaniem flagi wskazującej na imputację.
+      \item Kategoryczne (\texttt{host\_response\_time}, \texttt{host\_acceptance\_rate}): imputacja modą (najczęstszą wartością) lub stworzenie dedykowanej kategorii 'Missing'/'Unknown'.
+      \item Rozważenie bardziej zaawansowanych metod (np. KNN Imputer, IterativeImputer) w zależności od zasobów i wpływu na model.
+    \end{itemize}
+  \item \textbf{Analiza i obsługa wartości odstających (Outliers):}\\
+    Po obliczeniu metryk ($ADR_{hist}$, $Occ_{hist}$, $Rev_{annual, hist}$) przeprowadzimy analizę ich rozkładów (wizualizacje, statystyki) w celu identyfikacji wartości odstających. Strategia obsługi może obejmować:
+    \begin{itemize}
+      \item Winsoryzację (przycinanie wartości do określonego percentyla, np. 1\% i 99\%).
+      \item Usunięcie ofert z ewidentnie nierealistycznymi lub błędnymi metrykami przed finalną agregacją po dzielnicach.
+    \end{itemize}
+\end{enumerate}
+\end{tcolorbox}
+
+\subsection{Wnioski dotyczące adekwatności danych}
+
+\begin{infobox}
+Dostępne dane (\texttt{listings.csv}, \texttt{calendar.csv}) są \textbf{zasadniczo wystarczające} do realizacji \textbf{Etapu 1} projektu, tj. obliczenia metryk historycznych ($Y_{hist}$) dla części ofert (~70\% powinno mieć ID, ale realna liczba z wystarczającą historią w calendar może być mniejsza) i stworzenia wstępnego rankingu dzielnic według potencjału przychodowego (bazując na tych historycznych danych).
+
+Jednakże, zidentyfikowane \textbf{istotne problemy jakościowe} (liczne braki danych w \texttt{listings.csv}, brakujące \texttt{neighbourhood\_cleansed}, niekompletność i potencjalny szum w \texttt{calendar.csv}) oraz brak możliwości obliczenia $Y_{hist}$ dla wszystkich ofert, podkreślają \textbf{konieczność realizacji Etapu 2 (ML)}. Modele uczenia maszynowego będą kluczowe do:
+\begin{itemize}
+    \item Uzyskania bardziej \textbf{stabilnych i wiarygodnych estymat} potencjału przychodowego ($\widehat{Y}$) poprzez wykorzystanie zależności między cechami oferty ($X_{listing}$).
+    \item \textbf{Uogólnienia oceny} potencjału na oferty z krótką historią, brakami w danych kalendarza lub oferty zupełnie nowe (jeśli model będzie używany prospektywnie).
+    \item Potencjalnego \textbf{uwzględnienia większej liczby cech} (po imputacji) w ocenie potencjału, co może prowadzić do trafniejszych predykcji.
+    \item Zmniejszenia wpływu szumu i wartości odstających w danych historycznych.
+\end{itemize}
+Dlatego, choć Etap 1 jest wykonalny i dostarczy wstępnych wyników, \textbf{pełna realizacja celu biznesowego} (tj. najbardziej precyzyjne wskazanie lokalizacji o najwyższym potencjale przychodowym na przyszłość) będzie wymagała przejścia do Etapu 2 i budowy modeli predykcyjnych. Brak danych o kosztach pozostaje fundamentalnym ograniczeniem w estymacji rzeczywistego zysku w obu etapach.
+\end{infobox}
+
+\end{document}
