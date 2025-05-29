@@ -1,7 +1,7 @@
 import pandas as pd
 
-sessions_file = 'sessions.csv'
-users_file = 'users.csv'
+sessions_file = "sessions.csv"
+users_file = "users.csv"
 
 try:
     # Reading sessions.csv - might be large, consider chunking if memory is an issue
