@@ -10,6 +10,17 @@ venv/
 ENV/
 pip-selfcheck.json
 
+# Large data files - exclude from Git
+*.csv
+data/raw/*.csv
+data/raw2/*.csv
+data/processed/**/*.pkl
+*.pkl
+
+# Large files that exceed GitHub limits
+data/raw/
+data/raw2/
+
 # Distribution / packaging
 build/
 develop-eggs/
