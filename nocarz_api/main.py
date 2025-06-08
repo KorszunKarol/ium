@@ -1,16 +1,3 @@
-"""
-FastAPI application for Airbnb Annual Revenue Prediction
-
-This API provides endpoints for predicting annual revenue using both:
-- Baseline model (neighborhood median)
-- Advanced neural network model
-
-With A/B testing capabilities for comparing model performance.
-
-Author: Deployment Team
-Created: 2025-05-31
-"""
-
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -18,13 +5,14 @@ import uvicorn
 import logging
 import os
 from datetime import datetime
-from typing import Dict, Any, Optional
-import random
+from typing import Dict, Optional
 
-from app.schemas import PredictionRequest, PredictionResponse, HealthResponse, ABTestResponse
+from app.schemas import PredictionRequest, PredictionResponse, HealthResponse
 from models.model_loader import ModelLoader
-from utils.ab_testing import ABTestManager
 from utils.logging_config import setup_logging
+import sqlite3
+
+db_conn = None
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -46,18 +34,15 @@ app.add_middleware(
 )
 
 model_loader: Optional[ModelLoader] = None
-ab_test_manager: Optional[ABTestManager] = None
-
 
 @app.on_event("startup")
 async def startup_event():
     """Initialize models and services on startup"""
-    global model_loader, ab_test_manager
+    global model_loader
 
     logger.info("Starting Nocarz API...")
 
     try:
-
         models_dir = os.path.join(os.path.dirname(__file__), "..",
                                   "models_deploy")
         print("-" * 100)
@@ -66,10 +51,19 @@ async def startup_event():
         print("-" * 100)
         model_loader = ModelLoader(models_dir)
         model_loader.load_models()
-        logger.info("Models loaded successfully")
+        logger.info("Model loaded successfully")
 
-        ab_test_manager = ABTestManager()
-        logger.info("A/B testing manager initialized")
+        global db_conn
+        db_conn = sqlite3.connect("predictions.db")
+        db_conn.execute("""
+            CREATE TABLE IF NOT EXISTS predictions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ab_test TEXT,
+                neighborhood TEXT,
+                predicted_revenue REAL
+            )
+        """)
+        db_conn.commit()
 
         logger.info("Nocarz API startup completed successfully")
 
@@ -92,7 +86,13 @@ async def root():
         "version": "1.0.0",
         "docs": "/docs"
     }
-
+    
+@app.get("/get_results", response_model=Dict[str, str])
+async def get_results():
+    return {
+        "model A": "Kensington and Chelsea",
+        "model B": "City of London"
+    }
 
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
@@ -116,57 +116,10 @@ async def health_check():
         raise HTTPException(status_code=503,
                             detail=f"Service unhealthy: {str(e)}")
 
-
 @app.post("/predict", response_model=PredictionResponse)
-async def predict_revenue(request: PredictionRequest):
-    """
-  Predict annual revenue for an Airbnb listing  This endpoint uses A/B testing to serve predictions from either:
-  - Baseline model (neighborhood median)
-  - Neural network model  The model selection is randomized based on the configured split ratio.
-  """
-    try:
-        if model_loader is None or ab_test_manager is None:
-            raise HTTPException(status_code=503,
-                                detail="Services not initialized")
-
-        selected_model = ab_test_manager.select_model()
-
-        if selected_model == "neural_net":
-            # Use neural net model columns
-            input_df = request.to_dataframe(
-                model_loader.get_neural_net_features())
-            prediction = model_loader.predict_neural_net(input_df)
-        else:
-            # Use baseline model columns
-            input_df = request.to_dataframe(
-                model_loader.get_baseline_features())
-            prediction = model_loader.predict_baseline(input_df)
-
-        ab_test_manager.log_prediction(
-            model_used=selected_model,
-            input_data=input_df.to_dict(orient="records")[0],
-            prediction=prediction)
-
-        return PredictionResponse(
-            predicted_revenue=prediction["predicted_revenue"],
-            model_used=selected_model,
-            confidence_interval=prediction.get("confidence_interval"),
-            prediction_id=prediction["prediction_id"],
-            timestamp=datetime.utcnow())
-
-    except ValueError as e:
-        logger.warning(f"Invalid input data: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Invalid input: {str(e)}")
-    except Exception as e:
-        logger.error(f"Prediction failed: {str(e)}")
-        raise HTTPException(status_code=500,
-                            detail=f"Prediction failed: {str(e)}")
-
-
-@app.post("/predict/neural_net", response_model=PredictionResponse)
 async def predict_neural_net(request: PredictionRequest):
     """
-  Predict annual revenue using the neural network model specifically  This endpoint bypasses A/B testing and uses only the neural network model.
+  Predict annual revenue using the neural network model specifically
   """
     try:
         if model_loader is None:
@@ -175,7 +128,12 @@ async def predict_neural_net(request: PredictionRequest):
 
         input_df = request.to_dataframe(model_loader.get_neural_net_features())
         prediction = model_loader.predict_neural_net(input_df)
-
+        db_conn.execute(
+            "INSERT INTO predictions (ab_test, neighborhood, predicted_revenue) VALUES (?, ?, ?)",
+            (request.ab_test, request.neighbourhood_cleansed, prediction["predicted_revenue"])
+        )
+        db_conn.commit()
+        
         return PredictionResponse(
             predicted_revenue=prediction["predicted_revenue"],
             model_used="neural_net",
@@ -191,88 +149,23 @@ async def predict_neural_net(request: PredictionRequest):
         raise HTTPException(status_code=500,
                             detail=f"Prediction failed: {str(e)}")
 
-
-@app.post("/predict/baseline", response_model=PredictionResponse)
-async def predict_baseline(request: PredictionRequest):
-    """
-  Predict annual revenue using the baseline model specifically  This endpoint bypasses A/B testing and uses only the baseline model.
-  """
-    try:
-        if model_loader is None:
-            raise HTTPException(status_code=503,
-                                detail="Model loader not initialized")
-
-        input_df = request.to_dataframe(model_loader.get_baseline_features())
-        prediction = model_loader.predict_baseline(input_df)
-
-        return PredictionResponse(
-            predicted_revenue=prediction["predicted_revenue"],
-            model_used="baseline",
-            confidence_interval=prediction.get("confidence_interval"),
-            prediction_id=prediction["prediction_id"],
-            timestamp=datetime.utcnow())
-
-    except ValueError as e:
-        logger.warning(f"Invalid input data: {str(e)}")
-        raise HTTPException(status_code=400, detail=f"Invalid input: {str(e)}")
-    except Exception as e:
-        logger.error(f"Baseline prediction failed: {str(e)}")
-        raise HTTPException(status_code=500,
-                            detail=f"Prediction failed: {str(e)}")
-
-
-@app.get("/ab-test/status", response_model=ABTestResponse)
+@app.get("/ab-test/status")
 async def get_ab_test_status():
-    """Get current A/B testing status and statistics"""
-    try:
-        if ab_test_manager is None:
-            raise HTTPException(status_code=503,
-                                detail="A/B test manager not initialized")
+    """Get current A/B tesitng statistics"""
+    cursor = db_conn.cursor()
+    cursor.execute("""
+        SELECT ab_test, COUNT(*) as count, AVG(predicted_revenue) as mean_revenue
+        FROM predictions
+        GROUP BY ab_test
+    """)
+    rows = cursor.fetchall()
 
-        stats = ab_test_manager.get_statistics()
-
-        return ABTestResponse(
-            current_split=ab_test_manager.get_current_split(),
-            total_predictions=stats["total_predictions"],
-            neural_net_count=stats["neural_net_count"],
-            baseline_count=stats["baseline_count"],
-            neural_net_percentage=stats["neural_net_percentage"],
-            baseline_percentage=stats["baseline_percentage"])
-
-    except Exception as e:
-        logger.error(f"Failed to get A/B test status: {str(e)}")
-        raise HTTPException(status_code=500,
-                            detail=f"Failed to get status: {str(e)}")
-
-
-@app.post("/ab-test/split")
-async def update_ab_test_split(neural_net_ratio: float):
-    """
-  Update the A/B testing split ratio  Args:
-      neural_net_ratio: Fraction of requests to route to neural net (0.0 to 1.0)
-  """
-    try:
-        if ab_test_manager is None:
-            raise HTTPException(status_code=503,
-                                detail="A/B test manager not initialized")
-
-        if not 0.0 <= neural_net_ratio <= 1.0:
-            raise HTTPException(status_code=400,
-                                detail="Ratio must be between 0.0 and 1.0")
-
-        ab_test_manager.update_split(neural_net_ratio)
-
-        return {
-            "message": "A/B test split updated successfully",
-            "new_neural_net_ratio": neural_net_ratio,
-            "new_baseline_ratio": 1.0 - neural_net_ratio
-        }
-
-    except Exception as e:
-        logger.error(f"Failed to update A/B test split: {str(e)}")
-        raise HTTPException(status_code=500,
-                            detail=f"Failed to update split: {str(e)}")
-
+    return {
+        row[0]: {
+            "count": row[1],
+            "mean_revenue": row[2]
+        } for row in rows
+    }
 
 if __name__ == "__main__":
 
