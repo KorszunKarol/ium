@@ -1050,20 +1050,80 @@ class NeuralNetConfig:
 
     enable_histograms: bool = False
     log_dir_base: str = "logs/neural_net"
-    experiment_name: str = "20_features"
+    experiment_name: str = "50_features_expanded"
 
     def __post_init__(self):
         """Set default values that depend on other attributes."""
         if self.selected_features is None:
             self.selected_features = [
-                'latitude', 'longitude', 'distance_to_center', 'accommodates',
-                'bedrooms', 'bathrooms', 'price_log', 'amenities_count',
-                'review_scores_rating', 'number_of_reviews',
-                'host_is_superhost', 'host_days_active', 'instant_bookable',
-                'neighbourhood_price_rank', 'property_type_frequency',
-                'host_response_rate', 'review_scores_location',
-                'minimum_nights', 'calculated_host_listings_count',
-                'name_positive_sentiment'
+                # --- Core 20 Features ---
+                'latitude',
+                'longitude',
+                'distance_to_center',
+                'accommodates',
+                'bedrooms',
+                'bathrooms',
+                'price_log',
+                'amenities_count',
+                'review_scores_rating',
+                'number_of_reviews',
+                'host_is_superhost',
+                'instant_bookable',
+                'neighbourhood_price_rank',
+                'property_type_frequency',
+                'host_response_rate',
+                'review_scores_location',
+                'minimum_nights',
+                'calculated_host_listings_count',
+                'name_positive_sentiment',
+
+                # --- Adding 30 More for a Richer Model ---
+
+                # More specific review scores
+                'review_scores_cleanliness',
+                'review_scores_checkin',
+                'review_scores_communication',
+                'review_scores_value',
+                'review_scores_accuracy',
+
+                # Deeper host analysis
+                'host_acceptance_rate',
+                'host_identity_verified',
+                'host_total_listings_count',
+                'host_has_profile_pic',
+
+                # Core property characteristics
+                'beds',
+                'property_size',  # Engineered feature
+
+                # Engineered features for more context
+                'beds_per_person',
+                'bedrooms_per_person',
+                'total_review_months',
+                'review_intensity',  # Engineered feature
+                'price_competitiveness',  # Engineered feature
+
+                # Text-based features
+                'name_length',
+                'name_word_count',
+                'description_length',
+                'description_word_count',
+
+                # Key amenities (as binary flags)
+                'has_wifi',
+                'has_kitchen',
+                'has_air_conditioning',
+                'has_parking',
+                'has_elevator',
+                'has_gym',
+
+                # Amenity counts by type
+                'luxury_amenities_count',
+                'basic_amenities_count',
+
+                # Host listing distribution
+                'calculated_host_listings_count_entire_homes',
+                'calculated_host_listings_count_private_rooms',
             ]
 
         if self.hidden_layers is None:
@@ -1073,6 +1133,8 @@ class NeuralNetConfig:
 if __name__ == "__main__":
 
     config = NeuralNetConfig()
+    config
+
     print("--- Using Configuration for Training ---")
 
     print(pd.Series(asdict(config)).to_string())
@@ -1116,18 +1178,18 @@ if __name__ == "__main__":
 
     print("\n--- Evaluating Final Model on Test Set ---")
     evaluation_results = nn_model.evaluate_model(
-        model_name="Final Neural Network (20 features)")
+        model_name="Final Neural Network (50+ features)")
 
     nn_model.visualize_selected_features_distributions()
 
-    deployment_dir = "models/deployment_artifacts/neural_net_20_features"
+    deployment_dir = "models/deployment_artifacts/neural_net_50_features"
     nn_model.save_for_deployment(output_dir=deployment_dir)
 
     print(
         "\n--- Training, Evaluation, and Deployment Artifact Generation Complete ---"
     )
     print(
-        f"✅ Model and artifacts for the 20-feature model saved in: {deployment_dir}"
+        f"✅ Model and artifacts for the 50+ feature model saved in: {deployment_dir}"
     )
     print(
         f"To see detailed logs, run: tensorboard --logdir {config.log_dir_base}"
