@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+
 """
 Professional Data Visualization Script for Airbnb Data Analysis
 
@@ -13,7 +13,7 @@ import pandas as pd
 import numpy as np
 import matplotlib
 
-matplotlib.use("Agg")  # Use non-interactive backend
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 import plotly.express as px
@@ -44,7 +44,7 @@ class AirbnbVisualizationGenerator:
 
     def setup_environment(self):
         """Setup plotting environment and create output directory"""
-        # Set professional plotting style
+
         plt.style.use("seaborn-v0_8-whitegrid")
         plt.rcParams["figure.figsize"] = (12, 8)
         plt.rcParams["font.size"] = 12
@@ -53,7 +53,7 @@ class AirbnbVisualizationGenerator:
         plt.rcParams["xtick.labelsize"] = 10
         plt.rcParams["ytick.labelsize"] = 10
 
-        # Create output directory
+
         Path(self.output_dir).mkdir(parents=True, exist_ok=True)
         print(f"Output directory: {self.output_dir}")
 
@@ -69,7 +69,7 @@ class AirbnbVisualizationGenerator:
         print(f"Calendar: {self.calendar_df.shape}")
         print(f"Reviews: {self.reviews_df.shape}")
 
-        # Load revenue analysis if available
+
         try:
             self.reliable_listings = pd.read_pickle(
                 self.data_dir + "analysis/reliable_listings.pkl"
@@ -91,11 +91,11 @@ class AirbnbVisualizationGenerator:
         html_path = os.path.join(self.output_dir, filename.replace(".png", ".html"))
         png_path = os.path.join(self.output_dir, filename)
 
-        # Save as HTML (interactive)
+
         plot(fig, filename=html_path, auto_open=False)
         print(f"Saved: {filename.replace('.png', '.html')}")
 
-        # Save as PNG (static)
+
         try:
             fig.write_image(png_path, width=1200, height=700)
             print(f"Saved: {filename}")
@@ -106,7 +106,7 @@ class AirbnbVisualizationGenerator:
         """Generate missing value analysis charts"""
         print("\n=== Generating Missing Data Analysis ===")
 
-        # Calculate missing values for key features
+
         key_features = [
             "neighbourhood_cleansed",
             "property_type",
@@ -151,19 +151,19 @@ class AirbnbVisualizationGenerator:
             "missing_percentage", ascending=False
         )
 
-        # Chart 1: Missing Data Percentages
+
         plt.figure(figsize=(12, 8))
         top_missing = missing_df.head(15)
 
-        # Create color map based on severity
+
         colors = []
         for pct in top_missing["missing_percentage"]:
             if pct > 50:
-                colors.append("#D32F2F")  # Red
+                colors.append("
             elif pct > 20:
-                colors.append("#FF8F00")  # Orange
+                colors.append("
             else:
-                colors.append("#FBC02D")  # Yellow
+                colors.append("
 
         bars = plt.barh(
             range(len(top_missing)),
@@ -176,7 +176,7 @@ class AirbnbVisualizationGenerator:
         plt.title("Missing Data by Feature (Top 15)", fontweight="bold", pad=20)
         plt.grid(axis="x", alpha=0.3)
 
-        # Add percentage labels on bars
+
         for i, (idx, row) in enumerate(top_missing.iterrows()):
             plt.text(
                 row["missing_percentage"] + 0.5,
@@ -190,7 +190,7 @@ class AirbnbVisualizationGenerator:
         self.save_plot("01_missing_data_percentages.png")
         plt.close()
 
-        # Chart 2: Missing Value Correlation
+
         geo_review_features = [
             "neighbourhood_cleansed",
             "latitude",
@@ -241,7 +241,7 @@ class AirbnbVisualizationGenerator:
         if "neighbourhood_cleansed" not in self.listings_df.columns:
             return
 
-        # Chart 3: Top Neighborhoods by Listing Count
+
         neighbourhood_counts = self.listings_df["neighbourhood_cleansed"].value_counts()
 
         plt.figure(figsize=(14, 8))
@@ -259,7 +259,7 @@ class AirbnbVisualizationGenerator:
         )
         plt.grid(axis="x", alpha=0.3)
 
-        # Add value labels
+
         for i, count in enumerate(top_20_neighbourhoods.values):
             plt.text(count + 50, i, f"{count:,}", va="center", fontsize=10)
 
@@ -267,7 +267,7 @@ class AirbnbVisualizationGenerator:
         self.save_plot("03_top_neighborhoods_by_count.png")
         plt.close()
 
-        # Chart 4: Distribution of Neighborhood Sizes
+
         plt.figure(figsize=(12, 6))
         plt.hist(
             neighbourhood_counts.values,
@@ -282,7 +282,7 @@ class AirbnbVisualizationGenerator:
         plt.title("Distribution of Neighborhood Sizes", fontweight="bold", pad=20)
         plt.grid(alpha=0.3)
 
-        # Add statistics
+
         mean_size = neighbourhood_counts.mean()
         median_size = neighbourhood_counts.median()
         plt.axvline(
@@ -311,13 +311,13 @@ class AirbnbVisualizationGenerator:
             print("Latitude or Longitude data not available")
             return
 
-        # Interactive London Listings Geographic Distribution
+
         plot_df = self.listings_df[
             ["latitude", "longitude", "room_type", "price", "neighbourhood_cleansed"]
         ].copy()
         plot_df.dropna(subset=["latitude", "longitude"], inplace=True)
 
-        # Clean price data
+
         if "price" in plot_df.columns:
             plot_df["price_cleaned"] = plot_df["price"].replace(
                 {r"\$|,": ""}, regex=True
@@ -325,22 +325,22 @@ class AirbnbVisualizationGenerator:
             plot_df["price_cleaned"] = pd.to_numeric(
                 plot_df["price_cleaned"], errors="coerce"
             )
-            # Fill NaN values with median price or a default value
+
             plot_df["price_cleaned"] = plot_df["price_cleaned"].fillna(
                 plot_df["price_cleaned"].median()
             )
-            # If still NaN (all values were NaN), use a default
+
             if plot_df["price_cleaned"].isna().all():
                 plot_df["price_cleaned"] = 100
         else:
-            plot_df["price_cleaned"] = 100  # Default value
+            plot_df["price_cleaned"] = 100
 
         plot_df["room_type"] = plot_df["room_type"].fillna("Unknown")
         plot_df["neighbourhood_cleansed"] = plot_df["neighbourhood_cleansed"].fillna(
             "Unknown"
         )
 
-        # Sample for performance
+
         sample_size = min(20000, len(plot_df))
         sample_df = plot_df.sample(n=sample_size, random_state=42)
 
@@ -360,7 +360,7 @@ class AirbnbVisualizationGenerator:
             color_discrete_sequence=px.colors.qualitative.Plotly,
             zoom=10,
             height=700,
-            title=f"Interactive Geographic Distribution of London Airbnb Listings (n={sample_size:,})",
+            title=f"Interactive Geographic Distribution of London Listings (n={sample_size:,})",
         )
 
         fig.update_layout(mapbox_style="open-street-map")
@@ -372,7 +372,7 @@ class AirbnbVisualizationGenerator:
         """Generate property features analysis"""
         print("\n=== Generating Property Features Analysis ===")
 
-        # Chart 6: Room Type Distribution
+
         if "room_type" in self.listings_df.columns:
             plt.figure(figsize=(10, 8))
             room_counts = self.listings_df["room_type"].value_counts()
@@ -387,7 +387,7 @@ class AirbnbVisualizationGenerator:
             )
             plt.title("Distribution of Room Types", fontweight="bold", pad=20)
 
-            # Enhance text
+
             for autotext in autotexts:
                 autotext.set_color("black")
                 autotext.set_fontweight("bold")
@@ -397,7 +397,7 @@ class AirbnbVisualizationGenerator:
             self.save_plot("06_room_type_distribution.png")
             plt.close()
 
-        # Chart 7: Property Type Distribution
+
         if "property_type" in self.listings_df.columns:
             plt.figure(figsize=(14, 8))
             property_counts = self.listings_df["property_type"].value_counts().head(15)
@@ -413,7 +413,7 @@ class AirbnbVisualizationGenerator:
             plt.title("Top 15 Property Types", fontweight="bold", pad=20)
             plt.grid(axis="x", alpha=0.3)
 
-            # Add value labels
+
             for i, count in enumerate(property_counts.values):
                 plt.text(count + 100, i, f"{count:,}", va="center", fontsize=10)
 
@@ -421,7 +421,7 @@ class AirbnbVisualizationGenerator:
             self.save_plot("07_property_type_distribution.png")
             plt.close()
 
-        # Chart 8: Accommodates Distribution
+
         if "accommodates" in self.listings_df.columns:
             plt.figure(figsize=(12, 6))
             accommodates_data = pd.to_numeric(
@@ -441,7 +441,7 @@ class AirbnbVisualizationGenerator:
             plt.title("Distribution of Guest Capacity", fontweight="bold", pad=20)
             plt.grid(alpha=0.3)
 
-            # Add statistics
+
             mean_acc = accommodates_data.mean()
             median_acc = accommodates_data.median()
             plt.axvline(
@@ -463,7 +463,7 @@ class AirbnbVisualizationGenerator:
         """Generate review scores analysis"""
         print("\n=== Generating Review Scores Analysis ===")
 
-        # Chart 9: Overall Review Scores Distribution
+
         if "review_scores_rating" in self.listings_df.columns:
             plt.figure(figsize=(12, 6))
             review_scores = pd.to_numeric(
@@ -485,7 +485,7 @@ class AirbnbVisualizationGenerator:
             )
             plt.grid(alpha=0.3)
 
-            # Add statistics
+
             mean_score = review_scores.mean()
             median_score = review_scores.median()
             plt.axvline(
@@ -503,14 +503,14 @@ class AirbnbVisualizationGenerator:
             self.save_plot("09_review_scores_distribution.png")
             plt.close()
 
-        # Chart 10: Number of Reviews Distribution
+
         if "number_of_reviews" in self.listings_df.columns:
             plt.figure(figsize=(12, 6))
             review_counts = pd.to_numeric(
                 self.listings_df["number_of_reviews"], errors="coerce"
             ).dropna()
 
-            # Focus on 95th percentile to avoid extreme outliers
+
             upper_limit = review_counts.quantile(0.95)
             filtered_reviews = review_counts[review_counts <= upper_limit]
 
@@ -531,7 +531,7 @@ class AirbnbVisualizationGenerator:
             )
             plt.grid(alpha=0.3)
 
-            # Add statistics
+
             mean_reviews = review_counts.mean()
             median_reviews = review_counts.median()
             plt.axvline(
@@ -556,12 +556,12 @@ class AirbnbVisualizationGenerator:
         """Generate calendar and price analysis"""
         print("\n=== Generating Calendar and Price Analysis ===")
 
-        # Chart 11: Price Distribution from Calendar Data
+
         if "price_cleaned" in self.calendar_df.columns:
             plt.figure(figsize=(12, 6))
             valid_prices = self.calendar_df["price_cleaned"].dropna()
 
-            # Focus on reasonable price range (up to 95th percentile)
+
             upper_limit = valid_prices.quantile(0.95)
             filtered_prices = valid_prices[valid_prices <= upper_limit]
 
@@ -582,7 +582,7 @@ class AirbnbVisualizationGenerator:
             )
             plt.grid(alpha=0.3)
 
-            # Add statistics
+
             mean_price = valid_prices.mean()
             median_price = valid_prices.median()
             plt.axvline(
@@ -603,14 +603,14 @@ class AirbnbVisualizationGenerator:
             self.save_plot("11_daily_price_distribution.png")
             plt.close()
 
-        # Chart 12: Availability Pattern
+
         if "available" in self.calendar_df.columns:
             plt.figure(figsize=(10, 8))
             availability_counts = self.calendar_df["available"].value_counts()
 
             labels = ["Not Available (Booked)", "Available"]
-            colors = ["#FF6B6B", "#4ECDC4"]
-            explode = (0.05, 0)  # Slightly separate the "booked" slice
+            colors = ["
+            explode = (0.05, 0)
 
             wedges, texts, autotexts = plt.pie(
                 availability_counts.values,
@@ -627,7 +627,7 @@ class AirbnbVisualizationGenerator:
                 pad=20,
             )
 
-            # Enhance text
+
             for autotext in autotexts:
                 autotext.set_color("white")
                 autotext.set_fontweight("bold")
@@ -651,7 +651,7 @@ class AirbnbVisualizationGenerator:
 
         revenue_data = self.reliable_listings["annual_revenue_estimate"].dropna()
 
-        # Chart 13: Annual Revenue Distribution
+
         plt.figure(figsize=(12, 6))
         upper_limit = revenue_data.quantile(0.95)
 
@@ -674,12 +674,12 @@ class AirbnbVisualizationGenerator:
         plt.grid(alpha=0.3)
         plt.xlim(0, upper_limit)
 
-        # Calculate statistics for the data visible in the plot's range
+
         revenue_data_in_view = revenue_data[revenue_data <= upper_limit]
         mean_revenue_in_view = revenue_data_in_view.mean()
         median_revenue_in_view = revenue_data_in_view.median()
 
-        # Add statistics lines
+
         plt.axvline(
             mean_revenue_in_view,
             color="red",
@@ -698,16 +698,16 @@ class AirbnbVisualizationGenerator:
         self.save_plot("13_annual_revenue_distribution.png")
         plt.close()
 
-        # Chart 14: Revenue Analysis Subplots
+
         fig, axes = plt.subplots(2, 2, figsize=(15, 12))
 
-        # 1. Box plot
+
         axes[0, 0].boxplot(revenue_data, vert=True)
         axes[0, 0].set_ylabel("Annual Revenue Estimate (£)")
         axes[0, 0].set_title("Box Plot of Revenue Distribution")
         axes[0, 0].grid(alpha=0.3)
 
-        # 2. Histogram with fewer bins
+
         axes[0, 1].hist(
             revenue_data, bins=20, alpha=0.7, color="darkgreen", edgecolor="black"
         )
@@ -716,7 +716,7 @@ class AirbnbVisualizationGenerator:
         axes[0, 1].set_title("Histogram with 20 bins (full range)")
         axes[0, 1].grid(alpha=0.3)
 
-        # 3. Histogram focusing on lower values
+
         median_val = revenue_data.median()
         low_range_data = revenue_data[revenue_data <= median_val * 2]
         axes[1, 0].hist(
@@ -727,7 +727,7 @@ class AirbnbVisualizationGenerator:
         axes[1, 0].set_title(f"Revenue up to £{median_val * 2:,.0f} (2x median)")
         axes[1, 0].grid(alpha=0.3)
 
-        # 4. Log scale histogram
+
         log_data = revenue_data[revenue_data > 0]
         axes[1, 1].hist(log_data, bins=50, alpha=0.7, color="purple", edgecolor="black")
         axes[1, 1].set_xlabel("Annual Revenue Estimate (£)")
@@ -782,7 +782,7 @@ def main():
 
     args = parser.parse_args()
 
-    # Initialize and run visualization generator
+
     generator = AirbnbVisualizationGenerator(
         data_dir=args.data_dir, output_dir=args.output_dir
     )
