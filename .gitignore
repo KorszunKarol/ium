@@ -14,8 +14,6 @@ pip-selfcheck.json
 *.csv
 data/raw/*.csv
 data/raw2/*.csv
-data/processed/**/*.pkl
-*.pkl
 
 # Large files that exceed GitHub limits
 data/raw/
