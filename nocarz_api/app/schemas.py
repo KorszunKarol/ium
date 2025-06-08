@@ -1,14 +1,19 @@
 from pydantic import BaseModel, Field, validator
 from typing import Optional, Dict, Any, List, Tuple
+from enum import Enum
 from datetime import datetime
 import uuid
 import pandas as pd
 import numpy as np
 
+class ABTestEnum(str, Enum):
+    A = "A"
+    B = "B"
 
 class PredictionRequest(BaseModel):
     """Request model for revenue prediction"""
 
+    ab_test: ABTestEnum = Field(..., description="A/B test variant ('A' or 'B')")
     latitude: float = Field(...,
                             description="Latitude of the listing",
                             ge=-90,
